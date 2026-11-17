@@ -285,7 +285,7 @@ class ControlActivity : ComponentActivity() {
         }
         add(box, startBtn)
 
-        val help = mono(11f, "#7AA")
+        val help = mono(11f, "#77AAAA")
         help.setPadding(0, dp(14), 0, 0)
         help.text = "Pinch = tap. Two pinches = double tap. Pinch and hold, then move = drag " +
             "(it happens when you let go). Pinch and hold without moving = long press. " +

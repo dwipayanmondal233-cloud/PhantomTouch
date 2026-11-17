@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
         root.addView(title)
 
         permText = TextView(this)
-        mono(permText, 12f, "#8FB")
+        mono(permText, 12f, "#88FFBB")
         permText.setPadding(0, dp(4), 0, dp(4))
         root.addView(permText)
 
@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
         )
 
         val note = TextView(this)
-        mono(note, 11f, "#7AA")
+        mono(note, 11f, "#77AAAA")
         note.gravity = Gravity.CENTER
         note.setPadding(0, dp(6), 0, 0)
         note.text = "Runs on this device. No video is saved or sent."

@@ -152,7 +152,7 @@ class StudioActivity : ComponentActivity() {
         title.setShadowLayer(8f, 3f, 0f, Color.parseColor("#B44CFF"))
         box.addView(title)
 
-        val info = mono(11f, "#7AA")
+        val info = mono(11f, "#77AAAA")
         info.setPadding(0, dp(6), 0, dp(4))
         info.text = "Draw a shape 3 times, then pick an action. Good shapes: circle, V, Z, S, " +
             "triangle, star, heart, check mark. The recognizer ignores rotation, so a line " +

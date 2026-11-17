@@ -164,7 +164,7 @@ class DashboardActivity : ComponentActivity() {
         title.setShadowLayer(8f, 3f, 0f, Color.parseColor("#B44CFF"))
         box.addView(title)
 
-        val tag = mono(12f, "#7AA")
+        val tag = mono(12f, "#77AAAA")
         tag.text = "v1.0  |  your hands are the controller"
         tag.setPadding(0, dp(2), 0, 0)
         box.addView(tag)
@@ -221,7 +221,7 @@ class DashboardActivity : ComponentActivity() {
         box.addView(grid)
 
         val hc = card()
-        val help = mono(11f, "#7AA")
+        val help = mono(11f, "#77AAAA")
         help.text = "FIRST TIME\n" +
             "1. Fix every ✕ row above. Camera, Overlay and Accessibility are required.\n" +
             "2. Set Battery to Unrestricted (APP SETTINGS).\n" +
@@ -253,7 +253,7 @@ class DashboardActivity : ComponentActivity() {
     }
 
     private fun row(label: String, ok: Boolean, optional: Boolean, fix: (() -> Unit)?) {
-        val t = mono(14f, if (ok) "#88FFBB" else if (optional) "#7AA" else "#FF2BD6")
+        val t = mono(14f, if (ok) "#88FFBB" else if (optional) "#77AAAA" else "#FF2BD6")
         t.text = (if (ok) "✓ " else "✕ ") + label +
             (if (optional) " (optional)" else "") +
             (if (!ok && fix != null) "  <- tap" else "")
@@ -299,7 +299,7 @@ class DashboardActivity : ComponentActivity() {
         row("Microphone", hasMic(), true) {
             startActivity(Intent(this, ControlActivity::class.java))
         }
-        val t = mono(14f, if (HandService.running) "#00F0FF" else "#7AA")
+        val t = mono(14f, if (HandService.running) "#00F0FF" else "#77AAAA")
         t.text = if (HandService.running) "● Service: RUNNING" else "○ Service: stopped"
         t.setPadding(0, dp(8), 0, 0)
         statusBox.addView(t)
