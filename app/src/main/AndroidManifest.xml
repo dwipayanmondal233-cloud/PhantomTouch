@@ -22,6 +22,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".AirMouseActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

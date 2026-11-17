@@ -123,6 +123,27 @@ class MainActivity : ComponentActivity() {
         note.text = "Runs on this device. No video is saved or sent."
         root.addView(note)
 
+        val mouseBtn = Button(this)
+        mouseBtn.typeface = Typeface.MONOSPACE
+        mouseBtn.textSize = 14f
+        mouseBtn.setTextColor(Color.WHITE)
+        mouseBtn.text = "AIR MOUSE TEST"
+        val bg2 = GradientDrawable()
+        bg2.cornerRadius = dp(14).toFloat()
+        bg2.setColor(Color.parseColor("#10202E"))
+        bg2.setStroke(dp(2), Color.parseColor("#00F0FF"))
+        mouseBtn.background = bg2
+        mouseBtn.setOnClickListener {
+            if (running) stopCamera()
+            startActivity(android.content.Intent(this, AirMouseActivity::class.java))
+        }
+        root.addView(
+            mouseBtn,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)
+            )
+        )
+
         setContentView(root)
 
         try {
