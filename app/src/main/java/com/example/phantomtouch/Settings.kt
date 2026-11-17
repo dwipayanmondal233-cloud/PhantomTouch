@@ -70,6 +70,10 @@ object Settings {
         get() = f("calHh", 0.28f)
         set(v) = putF("calHh", v)
 
+    var skin: Int
+        get() = i("skin", 0)
+        set(v) = putI("skin", v)
+
     fun resetAll() {
         sp?.edit()?.clear()?.apply()
     }

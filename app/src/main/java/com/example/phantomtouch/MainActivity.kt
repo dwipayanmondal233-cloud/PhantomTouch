@@ -144,6 +144,26 @@ class MainActivity : ComponentActivity() {
             )
         )
 
+        val touchBtn = Button(this)
+        touchBtn.typeface = Typeface.MONOSPACE
+        touchBtn.textSize = 14f
+        touchBtn.setTextColor(Color.WHITE)
+        touchBtn.text = "AIR TOUCH (REAL SCREEN)"
+        val bg3 = GradientDrawable()
+        bg3.cornerRadius = dp(14).toFloat()
+        bg3.setColor(Color.parseColor("#10202E"))
+        bg3.setStroke(dp(2), Color.parseColor("#FF2BD6"))
+        touchBtn.background = bg3
+        touchBtn.setOnClickListener {
+            if (running) stopCamera()
+            startActivity(android.content.Intent(this, ControlActivity::class.java))
+        }
+        val tlp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(52)
+        )
+        tlp.setMargins(0, dp(6), 0, 0)
+        root.addView(touchBtn, tlp)
+
         setContentView(root)
 
         try {
