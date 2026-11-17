@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhantomTouch</title>
+<style>
+:root{--c:#00f0ff;--p:#b44cff;--k:#ff2bd6;--bg:#05060a;--card:#0d1018}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:#cfefff;font-family:ui-monospace,Consolas,monospace;font-size:14px;line-height:1.5;max-width:720px;margin:0 auto}
+h1{margin:10px 0 4px;font-size:34px;color:var(--c);text-shadow:2px 0 var(--p),-2px 0 var(--k);animation:gl 2.5s infinite}
+@keyframes gl{0%,90%,100%{text-shadow:2px 0 var(--p),-2px 0 var(--k)}93%{text-shadow:-4px 0 var(--p),4px 0 var(--k);transform:translateX(2px)}96%{text-shadow:3px 2px var(--c),-3px -2px var(--p);transform:translateX(-2px)}}
+h2{font-size:17px;color:var(--p);margin:0 0 8px}
+.sub{color:#7aa}
+.card{background:var(--card);border:1px solid #1c2a3a;border-radius:16px;padding:14px;margin:14px 0}
+.dl{display:block;text-align:center;padding:18px;margin:14px 0;font-size:19px;color:#fff;text-decoration:none;background:#10202e;border:2px solid var(--k);border-radius:16px;box-shadow:0 0 16px #ff2bd666}
+.big{display:block;width:100%;padding:14px;font:inherit;font-size:16px;color:#fff;background:#10202e;border:2px solid var(--c);border-radius:14px;box-shadow:0 0 10px #00f0ff44;cursor:pointer}
+.big.p{border-color:var(--p);box-shadow:0 0 10px #b44cff44}
+.big.flash{background:var(--c);color:#000}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+ul{margin:0;padding-left:18px}
+li{margin:4px 0}
+b{color:var(--c)}
+code{color:var(--k)}
+canvas{width:100%;max-width:320px;border:1px solid var(--c);border-radius:12px;background:#000;display:block;margin:10px auto}
+#vid{position:fixed;width:2px;height:2px;opacity:0;pointer-events:none}
+#cur{position:fixed;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid var(--c);background:#00f0ff33;box-shadow:0 0 14px var(--c);z-index:100;pointer-events:none;display:none}
+#cur.down{border-color:var(--k);background:#ff2bd688}
+#cur.pause{border-color:#888;background:#8883;box-shadow:none}
+.rip{position:fixed;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:2px solid #fff;z-index:99;pointer-events:none;animation:rp .5s forwards}
+@keyframes rp{to{transform:scale(3);opacity:0}}
+table{border-collapse:collapse;width:100%}
+td{border-top:1px solid #1c2a3a;padding:6px 4px;vertical-align:top}
+td:first-child{color:var(--c);white-space:nowrap;padding-right:10px}
+#status{color:var(--c);margin-top:8px}
+.small{font-size:12px;color:#7aa}
+</style>
+</head>
+<body>
+
+<h1>PHANTOMTOUCH</h1>
+<div class="sub">Your hands are the controller. Control your Android with gestures in front of the front camera. No touching the screen.</div>
+
+<a class="dl" href="https://github.com/dwipayanmondal233-cloud/PhantomTouch/releases/latest/download/PhantomTouch.apk">⬇ DOWNLOAD APK (Android)</a>
+
+<div class="card">
+  <h2>PRIVATE BY DESIGN</h2>
+  Everything runs on your device. No camera or audio data is stored or uploaded. The app has no internet permission.
+</div>
+
+<div class="card">
+  <h2>TRY IT NOW (live demo)</h2>
+  <div class="small">Uses your browser camera. Video stays in your browser. Pinch thumb and index to click. Fist pauses.</div>
+  <button class="big p" id="start" style="margin-top:10px">▶ START CAMERA</button>
+  <div id="status">Not started</div>
+  <canvas id="cam" width="320" height="240"></canvas>
+  <div class="grid">
+    <button class="big" id="d1">Click me: 0</button>
+    <button class="big p" id="d2">Toggle: OFF</button>
+    <button class="big" id="d3">Neon</button>
+    <button class="big p" id="d4">Reset</button>
+  </div>
+  <div class="small" id="log" style="margin-top:8px">Log: -</div>
+</div>
+
+<div class="card">
+  <h2>FEATURES</h2>
+  <ul>
+    <li><b>Hand tracking</b>: 21 landmarks, one or two hands, skeleton view.</li>
+    <li><b>Air Mouse</b>: monkey or dot cursor, pinch click, hold to drag, double pinch, fist pause, calibration.</li>
+    <li><b>Air Touch</b>: taps, long presses and drags on the real screen.</li>
+    <li><b>Air Scroll and navigation</b>: scroll, back, home, recents.</li>
+    <li><b>Air Keyboard</b>: floating keyboard, never types into password fields. Invisible air typing is an experiment.</li>
+    <li><b>Command Wheel</b>: home, back, recents, screenshot, volume, brightness, music, keyboard, flashlight and your apps.</li>
+    <li><b>Gesture Studio + Air Drawing</b>: record your own shapes and assign actions.</li>
+    <li><b>HUD</b> and <b>Practice mode</b>: a safe coach where nothing real is triggered.</li>
+    <li><b>Voice commands</b>: optional, on-device only.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>GESTURES</h2>
+  <table>
+    <tr><td>Pinch</td><td>Tap</td></tr>
+    <tr><td>Two pinches</td><td>Double tap</td></tr>
+    <tr><td>Pinch + hold + move</td><td>Drag (on release)</td></tr>
+    <tr><td>Fist</td><td>Pause cursor</td></tr>
+    <tr><td>Fist 1.2 s</td><td>Recents</td></tr>
+    <tr><td>Peace sign + move</td><td>Scroll</td></tr>
+    <tr><td>Open hand flick left</td><td>Back</td></tr>
+    <tr><td>Open hand flick up</td><td>Home</td></tr>
+    <tr><td>3 fingers 1 s</td><td>Keyboard</td></tr>
+    <tr><td>Rock sign 1 s</td><td>Command wheel</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>INSTALL</h2>
+  <ol>
+    <li>Tap DOWNLOAD APK and open the file.</li>
+    <li>Allow installs from your browser if Android asks.</li>
+    <li>Open PhantomTouch. Fix every ✕ row on the dashboard.</li>
+    <li>Set Battery to Unrestricted for the app.</li>
+    <li>Tap CALIBRATE once, then PRACTICE.</li>
+    <li>Tap START AIR TOUCH while the app is open.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>PROBLEMS AND FIXES</h2>
+  <ul>
+    <li><b>Play Protect "App blocked"</b>: Play Store, profile, Play Protect, gear, turn off scanning, install, turn it back on.</li>
+    <li><b>Accessibility switch greyed out</b>: Settings, Apps, PhantomTouch, ⋮ menu, Allow restricted settings.</li>
+    <li><b>After an update</b>: turn the Accessibility service off and on.</li>
+    <li><b>"App not installed" when updating</b>: uninstall the old version first.</li>
+    <li><b>Permission popups do not show</b>: other overlay apps can block them. Stop those apps, or grant Camera in Settings.</li>
+    <li><b>Camera stops with the screen off</b>: set Battery to Unrestricted.</li>
+    <li><b>Demo camera blocked</b>: tap the lock icon next to the address, Permissions, Camera, Allow.</li>
+  </ul>
+</div>
+
+<div class="card small">
+  <h2>HONEST LIMITS</h2>
+  Needs good light and your whole hand in view. Expect some jitter, so big buttons work best. Secure screens (banking, some system dialogs) cannot be controlled. This is a test build, so it is not on the Play Store.
+</div>
+
+<video id="vid" playsinline muted></video>
+<div id="cur"></div>
+
+<script type="module">
+import {HandLandmarker, FilesetResolver} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+const $ = id => document.getElementById(id);
+const S = {minCutoff:1.5, beta:4, pinchOn:0.25, pinchOff:0.40, sens:1.8};
+
+class OneEuro {
+  constructor(){ this.x = null; this.dx = 0; this.t = 0; }
+  a(c, dt){ const tau = 1/(2*Math.PI*c); return 1/(1 + tau/dt); }
+  f(v, t){
+    if (this.x === null){ this.x = v; this.t = t; return v; }
+    const dt = Math.max((t - this.t)/1000, 0.001);
+    const dv = (v - this.x)/dt;
+    this.dx = this.dx + this.a(1, dt)*(dv - this.dx);
+    const c = S.minCutoff + S.beta*Math.abs(this.dx);
+    this.x = this.x + this.a(c, dt)*(v - this.x);
+    this.t = t;
+    return this.x;
+  }
+  reset(){ this.x = null; this.dx = 0; }
+}
+const fx = new OneEuro(), fy = new OneEuro();
+const cursor = $("cur"), cam = $("cam"), ctx = cam.getContext("2d"), video = $("vid");
+let landmarker = null, lastVT = -1, pinched = false, flip = 0;
+let hist = [];
+
+const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const log = m => { $("log").textContent = "Log: " + m; };
+
+function posAt(t){
+  for (let i = hist.length-1; i >= 0; i--) if (hist[i].t <= t) return hist[i];
+  return hist[0];
+}
+function ripple(x,y){
+  const r = document.createElement("div");
+  r.className = "rip"; r.style.left = x+"px"; r.style.top = y+"px";
+  document.body.appendChild(r); setTimeout(() => r.remove(), 520);
+}
+function doClick(x, y){
+  ripple(x, y);
+  const el = document.elementFromPoint(x, y);
+  if (el){
+    const btn = el.closest("button");
+    if (btn){ btn.click(); btn.classList.add("flash"); setTimeout(() => btn.classList.remove("flash"), 200); }
+  }
+}
+function fingers(lm){
+  const w = lm[0];
+  const ext = (tip, pip) => dist(lm[tip], w) > dist(lm[pip], w);
+  return [ext(8,6), ext(12,10), ext(16,14), ext(20,18)];
+}
+
+function handle(res){
+  const now = performance.now();
+  ctx.save();
+  ctx.translate(cam.width, 0); ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, cam.width, cam.height);
+  ctx.lineWidth = 2;
+  (res.landmarks || []).forEach((lm, hi) => {
+    ctx.strokeStyle = hi === 0 ? "#00f0ff" : "#b44cff";
+    HandLandmarker.HAND_CONNECTIONS.forEach(c => {
+      ctx.beginPath();
+      ctx.moveTo(lm[c.start].x*cam.width, lm[c.start].y*cam.height);
+      ctx.lineTo(lm[c.end].x*cam.width, lm[c.end].y*cam.height);
+      ctx.stroke();
+    });
+    ctx.fillStyle = "#fff";
+    lm.forEach(p => ctx.fillRect(p.x*cam.width-2, p.y*cam.height-2, 4, 4));
+  });
+  ctx.restore();
+
+  if (!res.landmarks || res.landmarks.length === 0){
+    pinched = false; flip = 0; fx.reset(); fy.reset(); hist = [];
+    cursor.style.display = "none";
+    $("status").textContent = "No hand";
+    return;
+  }
+  cursor.style.display = "block";
+  const lm = res.landmarks[0];
+  const fs = fingers(lm);
+  const fist = !fs[0] && !fs[1] && !fs[2] && !fs[3];
+  if (fist){
+    pinched = false; flip = 0;
+    cursor.classList.remove("down");
+    cursor.classList.add("pause");
+    $("status").textContent = "PAUSED (fist)";
+    return;
+  }
+  cursor.classList.remove("pause");
+
+  const p = lm[8];
+  const nx = clamp((1 - p.x - 0.5)*S.sens + 0.5, 0, 1);
+  const ny = clamp((p.y - 0.5)*S.sens + 0.5, 0, 1);
+  const sx = fx.f(nx, now) * innerWidth;
+  const sy = fy.f(ny, now) * innerHeight;
+  hist.push({t: now, x: sx, y: sy});
+  while (hist.length > 2 && now - hist[0].t > 700) hist.shift();
+
+  const size = Math.max(dist(lm[0], lm[9]), 0.001);
+  const ratio = dist(lm[4], lm[8]) / size;
+  const raw = pinched ? ratio < S.pinchOff : ratio < S.pinchOn;
+  if (raw !== pinched){
+    flip++;
+    if (flip >= 2){
+      pinched = raw; flip = 0;
+      if (pinched){
+        cursor.classList.add("down");
+        const a = posAt(now - 150);
+        doClick(a.x, a.y);
+      } else {
+        cursor.classList.remove("down");
+      }
+    }
+  } else { flip = 0; }
+
+  cursor.style.left = sx + "px";
+  cursor.style.top = sy + "px";
+  $("status").textContent = "TRACKING" + (pinched ? " | PINCH" : "");
+}
+
+function loop(){
+  if (landmarker && video.readyState >= 2 && video.currentTime !== lastVT){
+    lastVT = video.currentTime;
+    try { handle(landmarker.detectForVideo(video, performance.now())); }
+    catch(e){ $("status").textContent = "Error: " + e.message; }
+  }
+  requestAnimationFrame(loop);
+}
+
+async function make(delegate){
+  const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  return HandLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+      delegate: delegate
+    },
+    runningMode: "VIDEO",
+    numHands: 1
+  });
+}
+
+$("start").onclick = async () => {
+  $("start").disabled = true;
+  $("status").textContent = "Loading model...";
+  try {
+    try { landmarker = await make("GPU"); }
+    catch(e){ landmarker = await make("CPU"); }
+    $("status").textContent = "Starting camera...";
+    const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "user", width: 640, height: 480}, audio: false});
+    video.srcObject = stream;
+    await video.play();
+    $("start").textContent = "● CAMERA ON";
+    $("status").textContent = "Show your hand";
+    loop();
+  } catch(e){
+    $("status").textContent = "Failed: " + e.message;
+    $("start").disabled = false;
+  }
+};
+
+let n = 0, tog = false, neon = false;
+$("d1").onclick = () => { n++; $("d1").textContent = "Click me: " + n; log("click"); };
+$("d2").onclick = () => { tog = !tog; $("d2").textContent = "Toggle: " + (tog ? "ON" : "OFF"); log("toggle"); };
+$("d3").onclick = () => { neon = !neon; document.body.style.background = neon ? "#0a0420" : "#05060a"; log("neon"); };
+$("d4").onclick = () => { n = 0; tog = false; neon = false; $("d1").textContent = "Click me: 0"; $("d2").textContent = "Toggle: OFF"; document.body.style.background = "#05060a"; log("reset"); };
+</script>
+</body>
+</html>

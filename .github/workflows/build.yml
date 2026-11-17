@@ -3,7 +3,11 @@ name: Build APK
 on:
   push:
     branches: [main]
+    paths-ignore: ['index.html']
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -35,3 +39,11 @@ jobs:
         with:
           name: PhantomTouch-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk PhantomTouch.apk
+          gh release delete latest --cleanup-tag --yes --repo ${{ github.repository }} || true
+          gh release create latest PhantomTouch.apk --repo ${{ github.repository }} --title "PhantomTouch (latest)" --notes "Newest build." --latest

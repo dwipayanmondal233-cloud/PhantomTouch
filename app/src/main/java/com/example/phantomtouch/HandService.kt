@@ -629,7 +629,7 @@ class HandService : LifecycleService() {
         val n = Notification.Builder(this, CH)
             .setContentTitle("PhantomTouch is on")
             .setContentText("Hand tracking runs on this device only.")
-            .setSmallIcon(android.R.drawable.ic_menu_view)
+            .setSmallIcon(R.drawable.ic_notif)
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
