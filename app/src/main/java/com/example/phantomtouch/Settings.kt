@@ -86,6 +86,12 @@ object Settings {
         get() = i("kbSize", 1)
         set(v) = putI("kbSize", v)
 
+    var wheel: String
+        get() = sp?.getString("wheel", WheelItems.DEFAULT) ?: WheelItems.DEFAULT
+        set(v) {
+            sp?.edit()?.putString("wheel", v)?.apply()
+        }
+
     fun resetAll() {
         sp?.edit()?.clear()?.apply()
     }

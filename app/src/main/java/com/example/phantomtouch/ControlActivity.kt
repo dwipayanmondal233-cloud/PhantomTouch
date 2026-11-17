@@ -195,6 +195,27 @@ class ControlActivity : ComponentActivity() {
         airBtn.setOnClickListener { poke(HandService.ACT_AIR) }
         add(box, airBtn)
 
+        val wheelBtn = neon("WHEEL: SHOW / HIDE", "#00F0FF")
+        wheelBtn.setOnClickListener { poke(HandService.ACT_WHEEL) }
+        add(box, wheelBtn)
+
+        val wheelEdit = neon("EDIT WHEEL (slices and apps)", "#B44CFF")
+        wheelEdit.setOnClickListener {
+            startActivity(Intent(this, WheelActivity::class.java))
+        }
+        add(box, wheelEdit)
+
+        val wsBtn = neon("ALLOW BRIGHTNESS (change settings)", "#00F0FF")
+        wsBtn.setOnClickListener {
+            startActivity(
+                Intent(
+                    android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
+        add(box, wsBtn)
+
         startBtn = neon("START AIR TOUCH", "#FF2BD6")
         startBtn.setOnClickListener {
             if (HandService.running) {
@@ -225,6 +246,10 @@ class ControlActivity : ComponentActivity() {
             "Air typing is an EXPERIMENT. No keyboard is drawn. Your hand area is the " +
             "keyboard: top = numbers, bottom = space. Watch the small box at the top. " +
             "It is not accurate. When you turn it off it shows how many letters you kept.\n\n" +
+            "Wheel: hold the ROCK sign (index and pinky up, middle and ring down) " +
+            "for 1 second. Move to a slice and pinch. Pinch the middle or outside to close. " +
+            "Volume and brightness slices stay open so you can pinch again. " +
+            "Change slices and apps with EDIT WHEEL.\n\n" +
             "Problems and fixes:\n" +
             "- Accessibility greyed out: Settings, Apps, PhantomTouch, menu, Allow restricted settings.\n" +
             "- After installing an update, turn the Accessibility service off and on.\n" +

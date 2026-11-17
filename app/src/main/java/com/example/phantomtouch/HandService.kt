@@ -1,5 +1,6 @@
 package com.example.phantomtouch
 
+import android.accessibilityservice.AccessibilityService
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,10 +9,13 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.media.AudioManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Size
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
@@ -35,6 +39,7 @@ class HandService : LifecycleService() {
         const val ACT_KB = "pt.kb"
         const val ACT_AIR = "pt.air"
         const val ACT_KBSIZE = "pt.kbsize"
+        const val ACT_WHEEL = "pt.wheel"
     }
 
     private val controller = CursorController()
@@ -44,6 +49,7 @@ class HandService : LifecycleService() {
     private var overlay: CursorOverlay? = null
     private var kb: KeyboardOverlay? = null
     private var hint: HintOverlay? = null
+    private var wheel: WheelOverlay? = null
     private var provider: ProcessCameraProvider? = null
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -57,12 +63,15 @@ class HandService : LifecycleService() {
 
     private var airType = false
     private var kbDrag = false
+    private var wheelDrag = false
     private var lastHint = ""
     private var lastSay = ""
     private var lastSayT = 0L
 
     private var threeSince = 0L
     private var threeCool = 0L
+    private var rockSince = 0L
+    private var rockCool = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -89,6 +98,7 @@ class HandService : LifecycleService() {
             overlay = ov
             kb = KeyboardOverlay(this)
             hint = HintOverlay(this)
+            wheel = WheelOverlay(this)
         } catch (e: Exception) {
             Toast.makeText(this, "Start failed: " + e.message, Toast.LENGTH_LONG).show()
             stopSelf()
@@ -104,6 +114,7 @@ class HandService : LifecycleService() {
         when (action) {
             ACT_KB -> toggleKeyboard()
             ACT_AIR -> setAir(!airType)
+            ACT_WHEEL -> toggleWheel()
             ACT_KBSIZE -> {
                 val k = kb
                 if (k != null && k.visible) {
@@ -136,6 +147,8 @@ class HandService : LifecycleService() {
         overlay?.show()
     }
 
+    // ---------- Keyboard ----------
+
     private fun toggleKeyboard() {
         if (airType) {
             setAir(false)
@@ -158,6 +171,7 @@ class HandService : LifecycleService() {
         if (on == airType) return
         if (on) {
             kb?.hide()
+            wheel?.hide()
             typer.resetState()
             typer.resetCounts()
             airType = true
@@ -202,6 +216,141 @@ class HandService : LifecycleService() {
         val key = KeyLayout.find(typer.rows(), nx, ny) ?: return
         handleKey(key)
     }
+
+    // ---------- Wheel ----------
+
+    private fun toggleWheel() {
+        val w = wheel ?: return
+        if (w.visible) {
+            w.hide()
+            say("WHEEL OFF")
+            return
+        }
+        if (airType) {
+            say("Turn off air typing first")
+            return
+        }
+        val ids = WheelItems.ids()
+        if (ids.isEmpty()) {
+            say("Wheel is empty. Use EDIT WHEEL.")
+            return
+        }
+        val s = screenSize()
+        w.show(s[0], s[1], ids)
+        bringCursorFront()
+        say("WHEEL ON")
+    }
+
+    private fun wheelPress(x: Float, y: Float) {
+        val w = wheel ?: return
+        val i = w.itemAt(x, y)
+        if (i < 0) {
+            w.hide()
+            return
+        }
+        val id = w.idAt(i)
+        w.flash(i)
+        runWheelItem(id)
+    }
+
+    private fun runWheelItem(id: String) {
+        val acc = PhantomAccess.instance
+        when (id) {
+            "volup" -> volume(AudioManager.ADJUST_RAISE)
+            "voldn" -> volume(AudioManager.ADJUST_LOWER)
+            "brup" -> brightness(25)
+            "brdn" -> brightness(-25)
+            "music" -> mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            "next" -> mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
+            else -> {
+                wheel?.hide()
+                when (id) {
+                    "home" -> if (acc != null) acc.home() else say("Turn Accessibility on")
+                    "back" -> if (acc != null) acc.back() else say("Turn Accessibility on")
+                    "recents" -> if (acc != null) acc.recents() else say("Turn Accessibility on")
+                    "shot" -> shot()
+                    "kb" -> toggleKeyboard()
+                    else -> if (id.startsWith("app:")) launchApp(id.substring(4))
+                }
+            }
+        }
+    }
+
+    private fun shot() {
+        if (PhantomAccess.instance == null) {
+            say("Turn Accessibility on")
+            return
+        }
+        if (Build.VERSION.SDK_INT < 28) {
+            say("Screenshot needs Android 9 or newer")
+            return
+        }
+        main.postDelayed({
+            PhantomAccess.instance?.performGlobalAction(
+                AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT
+            )
+        }, 500L)
+    }
+
+    private fun volume(dir: Int) {
+        try {
+            val am = getSystemService(AudioManager::class.java)
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, AudioManager.FLAG_SHOW_UI)
+        } catch (e: Exception) {
+            say("Volume failed")
+        }
+    }
+
+    private fun brightness(delta: Int) {
+        if (!android.provider.Settings.System.canWrite(this)) {
+            say("Tap ALLOW BRIGHTNESS in the app first")
+            return
+        }
+        try {
+            val cr = contentResolver
+            val cur = android.provider.Settings.System.getInt(
+                cr, android.provider.Settings.System.SCREEN_BRIGHTNESS, 128
+            )
+            val v = (cur + delta).coerceIn(10, 255)
+            android.provider.Settings.System.putInt(
+                cr,
+                android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE,
+                android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+            )
+            android.provider.Settings.System.putInt(
+                cr, android.provider.Settings.System.SCREEN_BRIGHTNESS, v
+            )
+            say("Brightness " + (v * 100 / 255) + "%")
+        } catch (e: Exception) {
+            say("Brightness failed")
+        }
+    }
+
+    private fun mediaKey(code: Int) {
+        try {
+            val am = getSystemService(AudioManager::class.java)
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+            am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+        } catch (e: Exception) {
+            say("Media key failed")
+        }
+    }
+
+    private fun launchApp(pkg: String) {
+        val li = packageManager.getLaunchIntentForPackage(pkg)
+        if (li == null) {
+            say("App not found")
+            return
+        }
+        li.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(li)
+        } catch (e: Exception) {
+            say("Could not open app")
+        }
+    }
+
+    // ---------- Service basics ----------
 
     private fun startFg() {
         val nm = getSystemService(NotificationManager::class.java)
@@ -262,6 +411,26 @@ class HandService : LifecycleService() {
         return false
     }
 
+    private fun rockHold(hand: Hand?, w: Int, h: Int, now: Long): Boolean {
+        if (hand == null) {
+            rockSince = 0L
+            return false
+        }
+        val p = GestureEngine.analyze(hand, w, h)
+        val rock = p.index && !p.middle && !p.ring && p.pinky
+        if (!rock) {
+            rockSince = 0L
+            return false
+        }
+        if (rockSince == 0L) rockSince = now
+        if (now - rockSince >= 1000L && now >= rockCool) {
+            rockSince = 0L
+            rockCool = now + 2500L
+            return true
+        }
+        return false
+    }
+
     private fun analyze(proxy: ImageProxy) {
         try {
             val eng = engine ?: return
@@ -289,10 +458,12 @@ class HandService : LifecycleService() {
                 NavGestures.NONE
             }
             val three = threeFingerHold(hand, w, h, now)
+            val rock = rockHold(hand, w, h, now)
             main.post {
                 applyFrame(f, sw, sh, now)
                 applyNav(navAct, sw, sh)
                 if (three && running) toggleKeyboard()
+                if (rock && running) toggleWheel()
             }
         } catch (e: Exception) {
         } finally {
@@ -348,6 +519,12 @@ class HandService : LifecycleService() {
             if (f.visible && !f.paused) kbo.hover(x, y) else kbo.hover(-1f, -1f)
         }
 
+        val wo = wheel
+        val wheelOn = wo != null && wo.visible
+        if (wheelOn && wo != null) {
+            if (f.visible && !f.paused) wo.hover(x, y) else wo.hover(-1f, -1f)
+        }
+
         if (airType) {
             val key = if (f.visible && !f.paused) KeyLayout.find(typer.rows(), f.x, f.y) else null
             val name = when {
@@ -370,7 +547,9 @@ class HandService : LifecycleService() {
         when (f.event) {
             CursorController.EV_CLICK, CursorController.EV_DOUBLE -> {
                 ov.slam(now)
-                if (airType) {
+                if (wheelOn) {
+                    wheelPress(ex, ey)
+                } else if (airType) {
                     airPress(f.evX, f.evY)
                 } else if (kbOn && kbo != null && kbo.contains(ex, ey)) {
                     kbPress(ex, ey)
@@ -382,7 +561,10 @@ class HandService : LifecycleService() {
             }
             CursorController.EV_DRAG_START -> {
                 ov.slam(now)
-                if (airType) {
+                if (wheelOn) {
+                    wheelDrag = true
+                    wheelPress(ex, ey)
+                } else if (airType) {
                     kbDrag = true
                     airPress(f.evX, f.evY)
                 } else if (kbOn && kbo != null && kbo.contains(ex, ey)) {
@@ -395,7 +577,9 @@ class HandService : LifecycleService() {
                 }
             }
             CursorController.EV_DRAG_END -> {
-                if (kbDrag) {
+                if (wheelDrag) {
+                    wheelDrag = false
+                } else if (kbDrag) {
                     kbDrag = false
                 } else if (dragging) {
                     dragging = false
@@ -415,6 +599,8 @@ class HandService : LifecycleService() {
         } catch (e: Exception) {
         }
         main.removeCallbacksAndMessages(null)
+        wheel?.hide()
+        wheel = null
         kb?.hide()
         kb = null
         hint?.remove()
