@@ -216,6 +216,16 @@ class ControlActivity : ComponentActivity() {
         }
         add(box, wsBtn)
 
+        val studioBtn = neon("GESTURE STUDIO (record + assign)", "#B44CFF")
+        studioBtn.setOnClickListener {
+            startActivity(Intent(this, StudioActivity::class.java))
+        }
+        add(box, studioBtn)
+
+        val drawBtn = neon("AIR DRAW: ON / OFF", "#FF2BD6")
+        drawBtn.setOnClickListener { poke(HandService.ACT_DRAW) }
+        add(box, drawBtn)
+
         startBtn = neon("START AIR TOUCH", "#FF2BD6")
         startBtn.setOnClickListener {
             if (HandService.running) {
@@ -250,6 +260,9 @@ class ControlActivity : ComponentActivity() {
             "for 1 second. Move to a slice and pinch. Pinch the middle or outside to close. " +
             "Volume and brightness slices stay open so you can pinch again. " +
             "Change slices and apps with EDIT WHEEL.\n\n" +
+            "Air Draw: open GESTURE STUDIO and make gestures first. Turn on AIR DRAW " +
+            "(button or DRAW slice). Pinch and hold until the monkey slams, draw in the air, " +
+            "then release. Test mode only shows the name. ROCK sign = exit.\n\n" +
             "Problems and fixes:\n" +
             "- Accessibility greyed out: Settings, Apps, PhantomTouch, menu, Allow restricted settings.\n" +
             "- After installing an update, turn the Accessibility service off and on.\n" +

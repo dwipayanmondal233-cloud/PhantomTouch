@@ -20,7 +20,9 @@ object WheelItems {
         WheelDef("brdn", "Brightness down", "BRI-"),
         WheelDef("music", "Play / Pause", "PLAY"),
         WheelDef("next", "Next track", "NEXT"),
-        WheelDef("kb", "Keyboard", "KEYS")
+        WheelDef("kb", "Keyboard", "KEYS"),
+        WheelDef("flash", "Flashlight", "LIGHT"),
+        WheelDef("draw", "Air Draw", "DRAW")
     )
 
     fun ids(): List<String> =

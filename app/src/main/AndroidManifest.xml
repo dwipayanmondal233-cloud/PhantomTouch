@@ -46,6 +46,10 @@
             android:name=".WheelActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".StudioActivity"
+            android:exported="false" />
+
         <service
             android:name=".HandService"
             android:exported="false"

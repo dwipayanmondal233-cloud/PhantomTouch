@@ -92,6 +92,10 @@ object Settings {
             sp?.edit()?.putString("wheel", v)?.apply()
         }
 
+    var drawTest: Int
+        get() = i("drawTest", 1)
+        set(v) = putI("drawTest", v)
+
     fun resetAll() {
         sp?.edit()?.clear()?.apply()
     }

@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
@@ -40,6 +42,7 @@ class HandService : LifecycleService() {
         const val ACT_AIR = "pt.air"
         const val ACT_KBSIZE = "pt.kbsize"
         const val ACT_WHEEL = "pt.wheel"
+        const val ACT_DRAW = "pt.draw"
     }
 
     private val controller = CursorController()
@@ -50,6 +53,7 @@ class HandService : LifecycleService() {
     private var kb: KeyboardOverlay? = null
     private var hint: HintOverlay? = null
     private var wheel: WheelOverlay? = null
+    private var draw: DrawOverlay? = null
     private var provider: ProcessCameraProvider? = null
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -68,6 +72,12 @@ class HandService : LifecycleService() {
     private var lastSay = ""
     private var lastSayT = 0L
 
+    private var drawOn = false
+    private var drawing = false
+    private var drawLastT = 0L
+    private val strokePts = ArrayList<Pt2>()
+    private var torchOn = false
+
     private var threeSince = 0L
     private var threeCool = 0L
     private var rockSince = 0L
@@ -76,6 +86,7 @@ class HandService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         Settings.init(this)
+        GestureStore.init(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -99,6 +110,7 @@ class HandService : LifecycleService() {
             kb = KeyboardOverlay(this)
             hint = HintOverlay(this)
             wheel = WheelOverlay(this)
+            draw = DrawOverlay(this)
         } catch (e: Exception) {
             Toast.makeText(this, "Start failed: " + e.message, Toast.LENGTH_LONG).show()
             stopSelf()
@@ -115,6 +127,7 @@ class HandService : LifecycleService() {
             ACT_KB -> toggleKeyboard()
             ACT_AIR -> setAir(!airType)
             ACT_WHEEL -> toggleWheel()
+            ACT_DRAW -> setDraw(!drawOn)
             ACT_KBSIZE -> {
                 val k = kb
                 if (k != null && k.visible) {
@@ -147,9 +160,119 @@ class HandService : LifecycleService() {
         overlay?.show()
     }
 
+    // ---------- Air Draw ----------
+
+    private fun setDraw(on: Boolean) {
+        if (on == drawOn) return
+        if (on) {
+            if (airType) setAir(false)
+            wheel?.hide()
+            kb?.hide()
+            val d = draw ?: return
+            val s = screenSize()
+            val rec = GestureStore.recName
+            val b = when {
+                rec.isNotEmpty() -> "AIR REC: $rec"
+                Settings.drawTest == 1 -> "AIR DRAW (TEST ONLY)"
+                else -> "AIR DRAW"
+            }
+            d.show(s[0], s[1], "$b  |  ROCK = exit")
+            drawOn = true
+            drawing = false
+            strokePts.clear()
+            drawLastT = System.currentTimeMillis()
+            bringCursorFront()
+            say("AIR DRAW ON. Pinch and hold, draw, release.")
+        } else {
+            drawOn = false
+            drawing = false
+            strokePts.clear()
+            draw?.hide()
+            GestureStore.recName = ""
+            say("AIR DRAW OFF")
+        }
+    }
+
+    private fun handleDraw(
+        f: CursorFrame, sw: Int, sh: Int, now: Long, ov: CursorOverlay, dro: DrawOverlay
+    ) {
+        val x = (f.x * sw).coerceIn(0f, sw.toFloat())
+        val y = (f.y * sh).coerceIn(0f, sh.toFloat())
+
+        if (f.event == CursorController.EV_DRAG_START) {
+            ov.slam(now)
+            drawing = true
+            strokePts.clear()
+            strokePts.add(
+                Pt2((f.evX * sw).coerceIn(0f, sw.toFloat()), (f.evY * sh).coerceIn(0f, sh.toFloat()))
+            )
+            dro.begin()
+            drawLastT = now
+        }
+        if (drawing && f.state == CursorController.ST_DRAG && strokePts.size < 600) {
+            strokePts.add(Pt2(x, y))
+            dro.setPoints(strokePts)
+            drawLastT = now
+        }
+        if (f.event == CursorController.EV_DRAG_END && drawing) {
+            drawing = false
+            dro.end()
+            drawLastT = now
+            finishStroke(dro)
+        }
+        if (!drawing && now - drawLastT > 30000L) setDraw(false)
+    }
+
+    private fun finishStroke(dro: DrawOverlay) {
+        val pts = ArrayList<Pt2>(strokePts)
+        strokePts.clear()
+
+        val rec = GestureStore.recName
+        if (rec.isNotEmpty()) {
+            val g = GestureStore.find(rec)
+            if (g == null) {
+                GestureStore.recName = ""
+                dro.say("Recording target is gone")
+                return
+            }
+            val ok = GestureStore.addSample(g, pts)
+            dro.say(if (ok) "Sample saved for " + g.name + " (" + g.samples.size + ")" else "Too short. Draw bigger.")
+            return
+        }
+
+        val n = Recognizer.normalize(pts)
+        if (n == null) {
+            dro.say("Too short. Draw bigger.")
+            return
+        }
+        val m = Recognizer.recognize(n, GestureStore.all())
+        if (m == null) {
+            dro.say("No gestures saved")
+            return
+        }
+        val pct = (m.score * 100).toInt()
+        if (m.score < Recognizer.ACCEPT || m.score - m.second < 0.03f) {
+            dro.say("? " + m.name + " " + pct + "% (not sure)")
+            return
+        }
+        val g = m.gesture
+        if (Settings.drawTest == 1) {
+            dro.say("TEST: " + m.name + " " + pct + "%")
+        } else if (g.action.isEmpty()) {
+            dro.say(m.name + " " + pct + "% (no action)")
+        } else {
+            dro.say(m.name + " " + pct + "%")
+            runWheelItem(g.action)
+        }
+    }
+
     // ---------- Keyboard ----------
 
     private fun toggleKeyboard() {
+        if (drawOn) {
+            say("Turn off air draw first")
+            return
+        }
         if (airType) {
             setAir(false)
             return
@@ -170,6 +293,7 @@ class HandService : LifecycleService() {
     private fun setAir(on: Boolean) {
         if (on == airType) return
         if (on) {
+            if (drawOn) setDraw(false)
             kb?.hide()
             wheel?.hide()
             typer.resetState()
@@ -217,9 +341,13 @@ class HandService : LifecycleService() {
         handleKey(key)
     }
 
-    // ---------- Wheel ----------
+    // ---------- Wheel and actions ----------
 
     private fun toggleWheel() {
+        if (drawOn) {
+            setDraw(false)
+            return
+        }
         val w = wheel ?: return
         if (w.visible) {
             w.hide()
@@ -270,9 +398,38 @@ class HandService : LifecycleService() {
                     "recents" -> if (acc != null) acc.recents() else say("Turn Accessibility on")
                     "shot" -> shot()
                     "kb" -> toggleKeyboard()
+                    "flash" -> toggleFlash()
+                    "draw" -> setDraw(!drawOn)
                     else -> if (id.startsWith("app:")) launchApp(id.substring(4))
                 }
             }
+        }
+    }
+
+    private fun toggleFlash() {
+        try {
+            val cm = getSystemService(CameraManager::class.java)
+            var id: String? = null
+            for (c in cm.cameraIdList) {
+                val ch = cm.getCameraCharacteristics(c)
+                val hasFlash = ch.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                val back = ch.get(CameraCharacteristics.LENS_FACING) ==
+                    CameraCharacteristics.LENS_FACING_BACK
+                if (hasFlash && back) {
+                    id = c
+                    break
+                }
+            }
+            if (id == null) {
+                say("No flashlight found")
+                return
+            }
+            torchOn = !torchOn
+            cm.setTorchMode(id, torchOn)
+            say(if (torchOn) "FLASHLIGHT ON" else "FLASHLIGHT OFF")
+        } catch (e: Exception) {
+            torchOn = false
+            say("Flashlight failed")
         }
     }
 
@@ -513,6 +670,12 @@ class HandService : LifecycleService() {
         val sleeping = (now - lastMoveT > 5000L) && !f.pinched && !f.paused
         if (f.visible) ov.update(x, y, f.paused, f.pinched, sleeping)
 
+        val dro = draw
+        if (drawOn && dro != null) {
+            handleDraw(f, sw, sh, now, ov, dro)
+            return
+        }
+
         val kbo = kb
         val kbOn = kbo != null && kbo.visible
         if (kbOn && kbo != null) {
@@ -599,6 +762,9 @@ class HandService : LifecycleService() {
         } catch (e: Exception) {
         }
         main.removeCallbacksAndMessages(null)
+        GestureStore.recName = ""
+        draw?.hide()
+        draw = null
         wheel?.hide()
         wheel = null
         kb?.hide()
