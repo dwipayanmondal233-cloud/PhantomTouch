@@ -35,6 +35,7 @@ class HandService : LifecycleService() {
     }
 
     private val controller = CursorController()
+    private val nav = NavGestures()
     private var engine: HandEngine? = null
     private var overlay: CursorOverlay? = null
     private var provider: ProcessCameraProvider? = null
@@ -135,10 +136,42 @@ class HandService : LifecycleService() {
 
             val now = System.currentTimeMillis()
             val f = controller.process(hand, w, h, now)
-            main.post { applyFrame(f, sw, sh, now) }
+            val navAct = if (Settings.navOn == 1) {
+                nav.process(hand, w, h, now)
+            } else {
+                NavGestures.NONE
+            }
+            main.post {
+                applyFrame(f, sw, sh, now)
+                applyNav(navAct, sw, sh)
+            }
         } catch (e: Exception) {
         } finally {
             proxy.close()
+        }
+    }
+
+    private fun applyNav(a: Int, sw: Int, sh: Int) {
+        if (a == NavGestures.NONE || !running) return
+        val acc = PhantomAccess.instance ?: return
+        when (a) {
+            NavGestures.BACK -> {
+                acc.back()
+                Toast.makeText(this, "BACK", Toast.LENGTH_SHORT).show()
+            }
+            NavGestures.HOME -> {
+                acc.home()
+                Toast.makeText(this, "HOME", Toast.LENGTH_SHORT).show()
+            }
+            NavGestures.RECENTS -> {
+                acc.recents()
+                Toast.makeText(this, "RECENTS", Toast.LENGTH_SHORT).show()
+            }
+            NavGestures.SCROLL_UP, NavGestures.SCROLL_DOWN -> {
+                var up = (a == NavGestures.SCROLL_UP)
+                if (Settings.invert == 1) up = !up
+                acc.scroll(up, sw.toFloat(), sh.toFloat())
+            }
         }
     }
 

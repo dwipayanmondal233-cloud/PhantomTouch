@@ -137,6 +137,28 @@ class ControlActivity : ComponentActivity() {
         }
         add(box, skinBtn)
 
+        val navBtn = neon("", "#00F0FF")
+        fun navText() {
+            navBtn.text = "Nav gestures: " + (if (Settings.navOn == 1) "ON" else "OFF")
+        }
+        navText()
+        navBtn.setOnClickListener {
+            Settings.navOn = if (Settings.navOn == 1) 0 else 1
+            navText()
+        }
+        add(box, navBtn)
+
+        val invBtn = neon("", "#B44CFF")
+        fun invText() {
+            invBtn.text = "Scroll direction: " + (if (Settings.invert == 1) "INVERTED" else "NORMAL")
+        }
+        invText()
+        invBtn.setOnClickListener {
+            Settings.invert = if (Settings.invert == 1) 0 else 1
+            invText()
+        }
+        add(box, invBtn)
+
         startBtn = neon("START AIR TOUCH", "#FF2BD6")
         startBtn.setOnClickListener {
             if (HandService.running) {
@@ -155,6 +177,10 @@ class ControlActivity : ComponentActivity() {
         help.text = "Pinch = tap. Two pinches = double tap. Pinch and hold, then move = drag " +
             "(it happens when you let go). Pinch and hold without moving = long press. " +
             "Fist = pause.\n\n" +
+            "Scroll: peace sign (index + middle up), move hand up or down.\n" +
+            "Back: flick open hand left, fast.\n" +
+            "Home: flick open hand up, fast.\n" +
+            "Recents: hold a fist for 1.2 seconds.\n\n" +
             "Problems and fixes:\n" +
             "- Accessibility greyed out: Settings, Apps, PhantomTouch, menu, Allow restricted settings.\n" +
             "- After installing an update, turn the Accessibility service off and on.\n" +

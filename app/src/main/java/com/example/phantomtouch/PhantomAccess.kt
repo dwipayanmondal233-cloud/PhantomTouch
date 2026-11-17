@@ -80,4 +80,24 @@ class PhantomAccess : AccessibilityService() {
             swipe(x1, y1, x2, y2, dur)
         }
     }
+
+    // fingerUp = true means the finger swipes up (content moves up).
+    fun scroll(fingerUp: Boolean, sw: Float, sh: Float) {
+        val x = sw / 2f
+        val from = if (fingerUp) sh * 0.65f else sh * 0.35f
+        val to = if (fingerUp) sh * 0.35f else sh * 0.65f
+        swipe(x, from, x, to, 250)
+    }
+
+    fun back() {
+        performGlobalAction(GLOBAL_ACTION_BACK)
+    }
+
+    fun home() {
+        performGlobalAction(GLOBAL_ACTION_HOME)
+    }
+
+    fun recents() {
+        performGlobalAction(GLOBAL_ACTION_RECENTS)
+    }
 }

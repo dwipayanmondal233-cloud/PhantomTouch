@@ -74,6 +74,14 @@ object Settings {
         get() = i("skin", 0)
         set(v) = putI("skin", v)
 
+    var navOn: Int
+        get() = i("navOn", 1)
+        set(v) = putI("navOn", v)
+
+    var invert: Int
+        get() = i("invert", 0)
+        set(v) = putI("invert", v)
+
     fun resetAll() {
         sp?.edit()?.clear()?.apply()
     }
