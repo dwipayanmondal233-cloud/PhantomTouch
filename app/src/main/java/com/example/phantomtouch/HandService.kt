@@ -1,11 +1,13 @@
 package com.example.phantomtouch
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -43,6 +45,7 @@ class HandService : LifecycleService() {
         const val ACT_KBSIZE = "pt.kbsize"
         const val ACT_WHEEL = "pt.wheel"
         const val ACT_DRAW = "pt.draw"
+        const val ACT_HUD = "pt.hud"
     }
 
     private val controller = CursorController()
@@ -54,6 +57,8 @@ class HandService : LifecycleService() {
     private var hint: HintOverlay? = null
     private var wheel: WheelOverlay? = null
     private var draw: DrawOverlay? = null
+    private var hud: HudOverlay? = null
+    private var voice: VoiceControl? = null
     private var provider: ProcessCameraProvider? = null
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -83,6 +88,12 @@ class HandService : LifecycleService() {
     private var rockSince = 0L
     private var rockCool = 0L
 
+    private var micOk = false
+    private var voiceT = 0L
+    private var gestureName = ""
+    private var gestureUntil = 0L
+    private var lastHud = ""
+
     override fun onCreate() {
         super.onCreate()
         Settings.init(this)
@@ -111,6 +122,9 @@ class HandService : LifecycleService() {
             hint = HintOverlay(this)
             wheel = WheelOverlay(this)
             draw = DrawOverlay(this)
+            val hu = HudOverlay(this)
+            hud = hu
+            if (Settings.hud == 1) hu.show()
         } catch (e: Exception) {
             Toast.makeText(this, "Start failed: " + e.message, Toast.LENGTH_LONG).show()
             stopSelf()
@@ -119,6 +133,7 @@ class HandService : LifecycleService() {
         running = true
         lastMoveT = System.currentTimeMillis()
         startCamera()
+        if (micOk) startVoice()
         return START_NOT_STICKY
     }
 
@@ -128,6 +143,9 @@ class HandService : LifecycleService() {
             ACT_AIR -> setAir(!airType)
             ACT_WHEEL -> toggleWheel()
             ACT_DRAW -> setDraw(!drawOn)
+            ACT_HUD -> {
+                if (Settings.hud == 1) hud?.show() else hud?.remove()
+            }
             ACT_KBSIZE -> {
                 val k = kb
                 if (k != null && k.visible) {
@@ -148,6 +166,11 @@ class HandService : LifecycleService() {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
+    private fun flashGesture(name: String) {
+        gestureName = name
+        gestureUntil = System.currentTimeMillis() + 1500L
+    }
+
     private fun screenSize(): IntArray {
         val dm = DisplayMetrics()
         @Suppress("DEPRECATION")
@@ -158,6 +181,92 @@ class HandService : LifecycleService() {
     private fun bringCursorFront() {
         overlay?.remove()
         overlay?.show()
+    }
+
+    // ---------- HUD ----------
+
+    private fun updateHud(f: CursorFrame, now: Long) {
+        val h = hud ?: return
+        if (Settings.hud != 1) return
+        val track = when {
+            !f.visible -> "NO HAND"
+            f.paused -> "PAUSED"
+            else -> "TRACK"
+        }
+        val mode = when {
+            drawOn -> "DRAW"
+            airType -> "AIR TYPE"
+            wheel?.visible == true -> "WHEEL"
+            kb?.visible == true -> "KEYS"
+            else -> "CURSOR"
+        }
+        val g = if (now < gestureUntil) {
+            gestureName
+        } else {
+            when {
+                !f.visible -> "-"
+                f.paused -> "FIST"
+                f.state == CursorController.ST_DRAG -> "DRAG"
+                f.pinched -> "PINCH"
+                else -> "MOVE"
+            }
+        }
+        val mic = if (voice?.listening == true) " | MIC" else ""
+        val t = "$track | $mode | $g$mic"
+        if (t != lastHud) {
+            lastHud = t
+            h.setText(t)
+        }
+    }
+
+    // ---------- Voice ----------
+
+    private fun startVoice() {
+        val v = VoiceControl(
+            this,
+            { phrase -> onVoice(phrase) },
+            { problem ->
+                say(problem)
+                voice = null
+            }
+        )
+        val err = v.start()
+        if (err != null) {
+            say(err)
+            return
+        }
+        voice = v
+    }
+
+    private fun onVoice(phrase: String) {
+        val now = System.currentTimeMillis()
+        if (now - voiceT < 1500L) return
+        val t = phrase.lowercase().trim()
+        val id: String? = when {
+            t.contains("volume up") || t.contains("louder") -> "volup"
+            t.contains("volume down") || t.contains("quieter") -> "voldn"
+            t.contains("screenshot") || t.contains("screen shot") -> "shot"
+            t.contains("brightness up") -> "brup"
+            t.contains("brightness down") -> "brdn"
+            t.contains("go home") || t.contains("home screen") -> "home"
+            t.contains("go back") -> "back"
+            t.contains("recent apps") || t.contains("recents") -> "recents"
+            t.contains("keyboard") -> "kb"
+            t.contains("flashlight") || t.contains("flash light") || t.contains("torch") -> "flash"
+            t.contains("next song") || t.contains("next track") -> "next"
+            t.contains("pause") || t.contains("play music") -> "music"
+            t.contains("wheel") -> "wheel"
+            t.contains("air draw") -> "draw"
+            else -> null
+        }
+        if (id == null) {
+            flashGesture("? " + t.take(14))
+            return
+        }
+        voiceT = now
+        flashGesture("VOICE")
+        say("Voice: $t")
+        if (id == "wheel") toggleWheel() else runWheelItem(id)
     }
 
     // ---------- Air Draw ----------
@@ -524,7 +633,21 @@ class HandService : LifecycleService() {
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
-        ServiceCompat.startForeground(this, 1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+
+        val wantMic = Settings.voiceOn == 1 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        if (wantMic) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        try {
+            ServiceCompat.startForeground(this, 1, n, type)
+            micOk = wantMic
+        } catch (e: SecurityException) {
+            micOk = false
+            ServiceCompat.startForeground(
+                this, 1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            )
+        }
     }
 
     private fun startCamera() {
@@ -619,8 +742,14 @@ class HandService : LifecycleService() {
             main.post {
                 applyFrame(f, sw, sh, now)
                 applyNav(navAct, sw, sh)
-                if (three && running) toggleKeyboard()
-                if (rock && running) toggleWheel()
+                if (three && running) {
+                    flashGesture("3 FINGERS")
+                    toggleKeyboard()
+                }
+                if (rock && running) {
+                    flashGesture("ROCK")
+                    toggleWheel()
+                }
             }
         } catch (e: Exception) {
         } finally {
@@ -633,18 +762,22 @@ class HandService : LifecycleService() {
         val acc = PhantomAccess.instance ?: return
         when (a) {
             NavGestures.BACK -> {
+                flashGesture("BACK")
                 acc.back()
                 Toast.makeText(this, "BACK", Toast.LENGTH_SHORT).show()
             }
             NavGestures.HOME -> {
+                flashGesture("HOME")
                 acc.home()
                 Toast.makeText(this, "HOME", Toast.LENGTH_SHORT).show()
             }
             NavGestures.RECENTS -> {
+                flashGesture("RECENTS")
                 acc.recents()
                 Toast.makeText(this, "RECENTS", Toast.LENGTH_SHORT).show()
             }
             NavGestures.SCROLL_UP, NavGestures.SCROLL_DOWN -> {
+                flashGesture("SCROLL")
                 var up = (a == NavGestures.SCROLL_UP)
                 if (Settings.invert == 1) up = !up
                 acc.scroll(up, sw.toFloat(), sh.toFloat())
@@ -669,6 +802,8 @@ class HandService : LifecycleService() {
         }
         val sleeping = (now - lastMoveT > 5000L) && !f.pinched && !f.paused
         if (f.visible) ov.update(x, y, f.paused, f.pinched, sleeping)
+
+        updateHud(f, now)
 
         val dro = draw
         if (drawOn && dro != null) {
@@ -754,6 +889,8 @@ class HandService : LifecycleService() {
 
     override fun onDestroy() {
         running = false
+        voice?.stop()
+        voice = null
         try {
             provider?.unbindAll()
             executor.shutdown()
@@ -763,6 +900,8 @@ class HandService : LifecycleService() {
         }
         main.removeCallbacksAndMessages(null)
         GestureStore.recName = ""
+        hud?.remove()
+        hud = null
         draw?.hide()
         draw = null
         wheel?.hide()

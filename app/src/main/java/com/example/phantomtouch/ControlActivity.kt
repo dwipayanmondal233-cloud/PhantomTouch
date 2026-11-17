@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.SpeechRecognizer
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -26,11 +27,15 @@ class ControlActivity : ComponentActivity() {
     private lateinit var startBtn: Button
     private lateinit var skinBtn: Button
     private lateinit var sizeBtn: Button
+    private lateinit var hudBtn: Button
+    private lateinit var voiceBtn: Button
     private val handler = Handler(Looper.getMainLooper())
 
     private val camLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
     private val notifLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
+    private val micLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -67,12 +72,19 @@ class ControlActivity : ComponentActivity() {
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
 
+    private fun hasMic(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
     private fun canOverlay(): Boolean = android.provider.Settings.canDrawOverlays(this)
 
     private fun hasNotif(): Boolean =
         Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
+
+    private fun voiceEngine(): Boolean =
+        Build.VERSION.SDK_INT >= 33 && SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
 
     private fun poke(action: String) {
         if (!HandService.running) {
@@ -146,12 +158,32 @@ class ControlActivity : ComponentActivity() {
         }
         add(box, b5)
 
+        val practiceBtn = neon("PRACTICE MODE (safe coach)", "#FF2BD6")
+        practiceBtn.setOnClickListener {
+            if (HandService.running) {
+                Toast.makeText(this, "Stop Air Touch first", Toast.LENGTH_SHORT).show()
+            } else {
+                startActivity(Intent(this, PracticeActivity::class.java))
+            }
+        }
+        add(box, practiceBtn)
+
         skinBtn = neon("", "#B44CFF")
         skinBtn.setOnClickListener {
             Settings.skin = if (Settings.skin == 0) 1 else 0
             refresh()
         }
         add(box, skinBtn)
+
+        hudBtn = neon("", "#00F0FF")
+        hudBtn.setOnClickListener {
+            Settings.hud = if (Settings.hud == 1) 0 else 1
+            if (HandService.running) {
+                startService(Intent(this, HandService::class.java).setAction(HandService.ACT_HUD))
+            }
+            refresh()
+        }
+        add(box, hudBtn)
 
         val navBtn = neon("", "#00F0FF")
         fun navText() {
@@ -226,6 +258,20 @@ class ControlActivity : ComponentActivity() {
         drawBtn.setOnClickListener { poke(HandService.ACT_DRAW) }
         add(box, drawBtn)
 
+        val micBtn = neon("ALLOW MICROPHONE (voice, optional)", "#00F0FF")
+        micBtn.setOnClickListener { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+        add(box, micBtn)
+
+        voiceBtn = neon("", "#B44CFF")
+        voiceBtn.setOnClickListener {
+            Settings.voiceOn = if (Settings.voiceOn == 1) 0 else 1
+            if (Settings.voiceOn == 1 && !hasMic()) {
+                micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            refresh()
+        }
+        add(box, voiceBtn)
+
         startBtn = neon("START AIR TOUCH", "#FF2BD6")
         startBtn.setOnClickListener {
             if (HandService.running) {
@@ -263,13 +309,24 @@ class ControlActivity : ComponentActivity() {
             "Air Draw: open GESTURE STUDIO and make gestures first. Turn on AIR DRAW " +
             "(button or DRAW slice). Pinch and hold until the monkey slams, draw in the air, " +
             "then release. Test mode only shows the name. ROCK sign = exit.\n\n" +
+            "HUD: the small box at the top left shows tracking, mode and the last gesture. " +
+            "MIC appears when voice is listening. Turn it on or off with the HUD button.\n\n" +
+            "Practice: PRACTICE MODE is a safe 12-step coach. Nothing real is triggered. " +
+            "Stop Air Touch first, because both use the camera.\n\n" +
+            "Voice (optional, on-device, Android 13+, English): allow the microphone, " +
+            "switch Voice ON, then press START AIR TOUCH. Say: volume up, volume down, " +
+            "screenshot, brightness up, brightness down, go home, go back, recent apps, " +
+            "keyboard, flashlight, pause, next song, wheel, air draw. " +
+            "Needs the offline English speech pack. Some phones beep between phrases.\n\n" +
             "Problems and fixes:\n" +
+            "- Play Protect App blocked: Play Store, profile, Play Protect, gear, turn off scanning, install, turn it back on.\n" +
             "- Accessibility greyed out: Settings, Apps, PhantomTouch, menu, Allow restricted settings.\n" +
             "- After installing an update, turn the Accessibility service off and on.\n" +
+            "- App not installed when updating: uninstall the old version first.\n" +
             "- Stop other overlay apps (like MyBubble) if permission popups do not show.\n" +
             "- Set Battery to Unrestricted. Camera stops when the screen is off.\n" +
             "- Calibrate first in AIR MOUSE TEST. The values are shared.\n\n" +
-            "Everything runs on this device. No video is saved or sent."
+            "Everything runs on this device. No video or audio is saved or sent."
         box.addView(help)
 
         val sv = ScrollView(this)
@@ -289,11 +346,16 @@ class ControlActivity : ComponentActivity() {
         sb.append(if (canOverlay()) "Overlay ✓\n" else "Overlay ✕\n")
         sb.append(if (PhantomAccess.instance != null) "Accessibility ✓\n" else "Accessibility ✕\n")
         sb.append(if (hasNotif()) "Notifications ✓\n" else "Notifications ✕\n")
+        sb.append(if (hasMic()) "Microphone ✓ (optional)\n" else "Microphone ✕ (optional)\n")
+        sb.append(if (voiceEngine()) "Offline speech ✓ (optional)\n" else "Offline speech ✕ (optional)\n")
         sb.append(if (HandService.running) "Service: RUNNING" else "Service: stopped")
         permText.text = sb.toString()
         startBtn.text = if (HandService.running) "STOP AIR TOUCH" else "START AIR TOUCH"
         skinBtn.text = "Cursor: " + (if (Settings.skin == 0) "MONKEY" else "DOT") + " (tap to switch)"
         sizeBtn.text = "Keyboard size: " + sizeName() + " (tap to change)"
+        hudBtn.text = "HUD: " + (if (Settings.hud == 1) "ON" else "OFF") + " (tap to switch)"
+        voiceBtn.text = "Voice commands: " + (if (Settings.voiceOn == 1) "ON" else "OFF") +
+            " (applies on next START)"
     }
 
     override fun onDestroy() {

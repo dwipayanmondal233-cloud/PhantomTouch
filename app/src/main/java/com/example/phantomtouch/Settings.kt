@@ -96,6 +96,14 @@ object Settings {
         get() = i("drawTest", 1)
         set(v) = putI("drawTest", v)
 
+    var hud: Int
+        get() = i("hud", 1)
+        set(v) = putI("hud", v)
+
+    var voiceOn: Int
+        get() = i("voiceOn", 0)
+        set(v) = putI("voiceOn", v)
+
     fun resetAll() {
         sp?.edit()?.clear()?.apply()
     }
