@@ -15,6 +15,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -24,6 +25,7 @@ class ControlActivity : ComponentActivity() {
     private lateinit var permText: TextView
     private lateinit var startBtn: Button
     private lateinit var skinBtn: Button
+    private lateinit var sizeBtn: Button
     private val handler = Handler(Looper.getMainLooper())
 
     private val camLauncher =
@@ -71,6 +73,20 @@ class ControlActivity : ComponentActivity() {
         Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
+
+    private fun poke(action: String) {
+        if (!HandService.running) {
+            Toast.makeText(this, "Start Air Touch first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startService(Intent(this, HandService::class.java).setAction(action))
+    }
+
+    private fun sizeName(): String = when (Settings.kbSize) {
+        0 -> "SMALL"
+        2 -> "LARGE"
+        else -> "MEDIUM"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -159,6 +175,26 @@ class ControlActivity : ComponentActivity() {
         }
         add(box, invBtn)
 
+        val kbBtn = neon("KEYBOARD: SHOW / HIDE", "#00F0FF")
+        kbBtn.setOnClickListener { poke(HandService.ACT_KB) }
+        add(box, kbBtn)
+
+        sizeBtn = neon("", "#B44CFF")
+        sizeBtn.setOnClickListener {
+            Settings.kbSize = (Settings.kbSize + 1) % 3
+            refresh()
+            if (HandService.running) {
+                startService(
+                    Intent(this, HandService::class.java).setAction(HandService.ACT_KBSIZE)
+                )
+            }
+        }
+        add(box, sizeBtn)
+
+        val airBtn = neon("AIR TYPING (EXPERIMENT) ON / OFF", "#FF2BD6")
+        airBtn.setOnClickListener { poke(HandService.ACT_AIR) }
+        add(box, airBtn)
+
         startBtn = neon("START AIR TOUCH", "#FF2BD6")
         startBtn.setOnClickListener {
             if (HandService.running) {
@@ -181,6 +217,14 @@ class ControlActivity : ComponentActivity() {
             "Back: flick open hand left, fast.\n" +
             "Home: flick open hand up, fast.\n" +
             "Recents: hold a fist for 1.2 seconds.\n\n" +
+            "Keyboard: hold 3 fingers up (index, middle, ring) for 1 second. " +
+            "First tap a text field with a pinch, then pinch the keys. " +
+            "Shift key: once = one capital, twice = CAPS, three times = off. " +
+            "Never types into password fields. The same 3-finger hold also closes " +
+            "the keyboard or air typing.\n\n" +
+            "Air typing is an EXPERIMENT. No keyboard is drawn. Your hand area is the " +
+            "keyboard: top = numbers, bottom = space. Watch the small box at the top. " +
+            "It is not accurate. When you turn it off it shows how many letters you kept.\n\n" +
             "Problems and fixes:\n" +
             "- Accessibility greyed out: Settings, Apps, PhantomTouch, menu, Allow restricted settings.\n" +
             "- After installing an update, turn the Accessibility service off and on.\n" +
@@ -211,6 +255,7 @@ class ControlActivity : ComponentActivity() {
         permText.text = sb.toString()
         startBtn.text = if (HandService.running) "STOP AIR TOUCH" else "START AIR TOUCH"
         skinBtn.text = "Cursor: " + (if (Settings.skin == 0) "MONKEY" else "DOT") + " (tap to switch)"
+        sizeBtn.text = "Keyboard size: " + sizeName() + " (tap to change)"
     }
 
     override fun onDestroy() {

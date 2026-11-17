@@ -82,6 +82,10 @@ object Settings {
         get() = i("invert", 0)
         set(v) = putI("invert", v)
 
+    var kbSize: Int
+        get() = i("kbSize", 1)
+        set(v) = putI("kbSize", v)
+
     fun resetAll() {
         sp?.edit()?.clear()?.apply()
     }
